@@ -1,0 +1,41 @@
+# Compiled output
+/target/
+
+# Rust/Cargo specific files
+**/*.rs.bk
+Cargo.lock
+Cargo.toml.orig
+
+# Binaries
+*.exe
+*.exe~
+*.so
+*.dylib
+*.dll
+
+# Object files
+*.o
+
+# Dependency files
+*.d
+
+# Debug files
+*.dSYM/
+*.stackdump
+*.log
+*.timestamp
+*.lock
+*.
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+.vscode/
+.idea/
+*.iml
+*.bin*
+
+# Rust-specific files
+**/*.rs.bk
+**/*.log
