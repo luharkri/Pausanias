@@ -1,0 +1,2 @@
+Learn Rust	done
+go to Africa	not done
