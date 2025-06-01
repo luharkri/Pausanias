@@ -55,12 +55,16 @@ def save_to_csv(properties, filename="properties.csv"):
 def get_rental_price(address: str):
     # Format the address for the Zillow URL
     headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        
+        "User-Agent": 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36',
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive"
     }
-    
+    proxy_addresses = {
+        'http': 'http://72.206.181.123:4145',
+        'https': 'http://191.96.100.33:3128'
+    }
     # Print the address for debugging
     print(f"Getting rental price for: {address}")
     
@@ -77,20 +81,18 @@ def get_rental_price(address: str):
         print("hello trying to get")
         response = requests.get(url, headers=headers)
         response.raise_for_status()  # Ensure we handle unsuccessful responses
-        print("hello")
         # Parse the page using BeautifulSoup
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Print soup for debugging (optional)
-        print(soup)
 
         # Attempt to find rental price
         # Adjust based on actual page structure
         rental_price = None
-        price_element = soup.find('span', {'class': 'ds-value'})
+        price_element = soup.find("h2", class_="Text-c11n-8-107-0__sc-aiaia24-0 fisgSp")
         
         
-        
+        # print(soup.prettify()) 
         if price_element:
             rental_price = price_element.get_text(strip=True)
             print(f"Found rental price: {rental_price}")
