@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import time
+import re
 
 # Function to scrape Redfin properties based on county and filters
 def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, hoa: int):
@@ -15,7 +16,6 @@ def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, 
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive"
     }
-    
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -82,26 +82,21 @@ def get_rental_price(address: str):
         print("hello trying to get")
         response = requests.get(url, headers=headers)
         response.raise_for_status()  # Ensure we handle unsuccessful responses
-        # Parse the page using BeautifulSoup
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Print soup for debugging (optional)
-
-        # Attempt to find rental price
-        # Adjust based on actual page structure
-        rental_price = None
-        price_element = soup.find("h2", class_="Text-c11n-8-107-0__sc-aiaia24-0 fisgSp")
-        
-        
-        # print(soup.prettify()) 
-        if price_element:
-            rental_price = price_element.get_text(strip=True)
-            print(f"Found rental price: {rental_price}")
+        match = re.search(r'"rentZestimate":(\d+)', response.text)
+        if match:
+            rent = int(match.group(1))
+            print(f"Found rent estimate: ${rent}")
+            return f"${rent}"
         else:
-            print("Rental price not found")
-            rental_price = "Not Available"
+            print("Rent estimate not found in page text.")
+            return "Not Available"
 
-        return rental_price
+    except requests.exceptions.RequestException as e:
+        print(f"Request error: {e}")
+        return "Not Available"
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return "Not Available"
 
     except requests.exceptions.RequestException as e:
         # Handle errors (e.g., network issues, bad responses)
@@ -147,11 +142,15 @@ def main(county="Temecula", max_price="750k", min_beds=3, min_baths=2.5, hoa=150
     print("Fetching rental prices from Zillow...")
     properties_with_rentals = append_rental_prices(properties)
     print(f"Rental prices fetched for {len(properties_with_rentals)} properties.")
-    print(properties_with_rentals)
+    # print(properties_with_rentals)
+
+    # need to do some data analysis here
     # # Step 4: Save the final data to a new CSV file
-    # save_rental_to_csv(properties_with_rentals)
-    # print("Final data saved to properties_with_rental.csv.")
+    save_rental_to_csv(properties_with_rentals)
+
+    
 
 # Run the script
 if __name__ == "__main__":
     main()
+
