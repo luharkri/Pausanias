@@ -15,6 +15,7 @@ def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, 
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive"
     }
+    
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
 
