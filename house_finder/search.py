@@ -40,6 +40,8 @@ def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, 
             
             # Append the data
             properties.append([address, price, link])
+            if len(properties) > 1:
+                return properties
         except AttributeError:
             continue  # Skip if any data is missing
     
@@ -79,7 +81,6 @@ def get_rental_price(address: str):
 
     try:
         # Send GET request to Zillow
-        print("hello trying to get")
         response = requests.get(url, headers=headers)
         response.raise_for_status()  # Ensure we handle unsuccessful responses
         match = re.search(r'"rentZestimate":(\d+)', response.text)
@@ -108,6 +109,40 @@ def get_rental_price(address: str):
         return "Not Available"
 
 
+def clean_currency(val):
+    return float(val.replace("$", "").replace(",", "").strip())
+
+def calculate_mortgage_data(properties, down_percent=0.20, rate=0.065, term_months=360):
+    enriched_data = []
+
+    for address, list_price_str, url, rent_str in properties:
+        list_price = clean_currency(list_price_str)
+        purchase_price = list_price * 0.86
+        down_payment = purchase_price * down_percent
+        loan_amount = purchase_price - down_payment
+        monthly_rate = rate / 12
+
+        # Mortgage payment calculation
+        M = loan_amount * (monthly_rate * (1 + monthly_rate) ** term_months) / \
+            ((1 + monthly_rate) ** term_months - 1)
+
+        # Build new row
+        enriched_data.append([
+            address,
+            list_price_str,
+            url,
+            rent_str,
+            f"${purchase_price:,.2f}",
+            f"{down_percent * 100:.1f}%",
+            f"${down_payment:,.2f}",
+            f"${loan_amount:,.2f}",
+            f"{rate * 100:.2f}%",
+            term_months,
+            f"${M:,.2f}"
+        ])
+
+    return enriched_data
+
 # Function to append rental prices to the property data
 def append_rental_prices(properties):
     for property in properties:
@@ -134,19 +169,23 @@ def main(county="Temecula", max_price="750k", min_beds=3, min_baths=2.5, hoa=150
     properties = scrape_redfin(county, max_price, min_beds, min_baths, hoa)
     print(f"Found {len(properties)} properties.")
     
-    # Step 2: Save the properties to a CSV file
-    save_to_csv(properties)
-    print("Redfin data saved to properties.csv.")
+    # # Step 2: Save the properties to a CSV file
+    # save_to_csv(properties)
+    # print("Redfin data saved to properties.csv.")
     
     # Step 3: Append rental prices from Zillow
     print("Fetching rental prices from Zillow...")
     properties_with_rentals = append_rental_prices(properties)
     print(f"Rental prices fetched for {len(properties_with_rentals)} properties.")
-    # print(properties_with_rentals)
+    print(properties_with_rentals)
 
+    # Step 4
     # need to do some data analysis here
-    # # Step 4: Save the final data to a new CSV file
-    save_rental_to_csv(properties_with_rentals)
+    p = calculate_mortgage_data(properties=properties)
+
+
+    # # Step 5: Save the final data to a new CSV file
+    save_rental_to_csv(p)
 
     
 
