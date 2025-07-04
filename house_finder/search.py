@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 import csv
 import time
 import re
+import pandas as pd
+import numpy as np
 
 # Function to scrape Redfin properties based on county and filters
 def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, hoa: int):
@@ -34,6 +36,18 @@ def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, 
             
             # Extract the price
             price = listing.find('span', class_='bp-Homecard__Price--value').get_text(strip=True)
+
+            facts = listing.find('span', class_='KeyFacts-item').get_text(strip=True)
+            print(facts)
+            # hoa = None
+            # for fact in facts:
+            #     print(fact)
+                # if "HOA" in fact.text:
+                #     hoa = fact.get_text(strip=True)
+                    
+            print()
+            print("HOA - ", hoa)
+            print()
             
             # Extract the link
             link = 'https://www.redfin.com' + listing.find('a').get('href')
@@ -46,14 +60,6 @@ def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, 
             continue  # Skip if any data is missing
     
     return properties
-
-# Function to save the scraped data into a CSV file
-def save_to_csv(properties, filename="properties.csv"):
-    with open(filename, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file)
-        writer.writerow(["Address", "Price", "Redfin URL"])
-        for prop in properties:
-            writer.writerow(prop)
 
 def get_rental_price(address: str):
     # Format the address for the Zillow URL
@@ -112,37 +118,36 @@ def get_rental_price(address: str):
 def clean_currency(val):
     return float(val.replace("$", "").replace(",", "").strip())
 
-def calculate_mortgage_data(properties, down_percent=0.20, rate=0.065, term_months=360):
-    enriched_data = []
+def calculate_mortgage_data(properties, down_percent=0.20, rate=0.065, term_months=360, tax_rate = .011):
+    # columns=["Address", "Price", "Redfin URL", "Rental Price"]
+    price = clean_currency(row["Price"])
+    loan_amount = price - (down_percent * price)
+    monthly_rate = rate / 12
+    # Mortgage payment calculation
+    monthly_payment = loan_amount * (monthly_rate * (1 + monthly_rate) ** term_months) / \
+        ((1 + monthly_rate) ** term_months - 1)
+    monthly_property_tax = price * tax_rate / 12
 
-    for address, list_price_str, url, rent_str in properties:
-        list_price = clean_currency(list_price_str)
-        purchase_price = list_price * 0.86
-        down_payment = purchase_price * down_percent
-        loan_amount = purchase_price - down_payment
-        monthly_rate = rate / 12
+    properties["loan"] = 0
+    properties["down payment"] = 0
+    properties["monthly payment"] = 0
+    properties["monthly taxes"] = 0
+    properties["monthly insurance"] = 0
+    properties["monthly balance"] = 0
+    for index, row in properties.iterrows():
+        properties.loc[index, 'loan'] = loan_amount
+        properties.loc[index, 'down payment'] = down_percent * price
+        properties.loc[index, 'monthly payment'] = monthly_payment
+        properties.loc[index, 'monthly taxes'] = monthly_property_tax
+        # properties.loc[index, 'monthly taxes'] = monthly_property_tax
+        # properties.loc[index, 'monthly taxes'] = monthly_property_tax
 
-        # Mortgage payment calculation
-        M = loan_amount * (monthly_rate * (1 + monthly_rate) ** term_months) / \
-            ((1 + monthly_rate) ** term_months - 1)
 
-        # Build new row
-        enriched_data.append([
-            address,
-            list_price_str,
-            url,
-            rent_str,
-            f"${purchase_price:,.2f}",
-            f"{down_percent * 100:.1f}%",
-            f"${down_payment:,.2f}",
-            f"${loan_amount:,.2f}",
-            f"{rate * 100:.2f}%",
-            term_months,
-            f"${M:,.2f}"
-        ])
 
-    return enriched_data
 
+    print(properties)
+    print()
+    
 # Function to append rental prices to the property data
 def append_rental_prices(properties):
     for property in properties:
@@ -169,23 +174,22 @@ def main(county="Temecula", max_price="750k", min_beds=3, min_baths=2.5, hoa=150
     properties = scrape_redfin(county, max_price, min_beds, min_baths, hoa)
     print(f"Found {len(properties)} properties.")
     
-    # # Step 2: Save the properties to a CSV file
-    # save_to_csv(properties)
-    # print("Redfin data saved to properties.csv.")
     
-    # Step 3: Append rental prices from Zillow
-    print("Fetching rental prices from Zillow...")
-    properties_with_rentals = append_rental_prices(properties)
-    print(f"Rental prices fetched for {len(properties_with_rentals)} properties.")
-    print(properties_with_rentals)
+    # # Step 3: Append rental prices from Zillow
+    # print("Fetching rental prices from Zillow...")
+    # properties_with_rentals = append_rental_prices(properties)
+    # print(f"Rental prices fetched for {len(properties_with_rentals)} properties.")
+    # print(properties_with_rentals)
+    
+    # # Convert to DataFrame
+    # df = pd.DataFrame(properties_with_rentals, columns=["Address", "Price", "Redfin URL", "Rental Price"])
 
-    # Step 4
-    # need to do some data analysis here
-    p = calculate_mortgage_data(properties=properties)
-
+    # # Step 4
+    # calculate_mortgage_data(properties=df)
+    # print(df)
 
     # # Step 5: Save the final data to a new CSV file
-    save_rental_to_csv(p)
+    # save_rental_to_csv(p)
 
     
 

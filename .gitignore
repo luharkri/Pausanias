@@ -12,6 +12,7 @@ Cargo.toml.orig
 *.so
 *.dylib
 *.dll
+*venv
 
 # Object files
 *.o
