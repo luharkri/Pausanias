@@ -121,6 +121,8 @@ def calculate_mortgage_data(properties, down_percent=0.20, rate=0.065, term_mont
     properties["monthly balance"] = 0
     for index, row in properties.iterrows():
         # columns=["Address", "Price", "Redfin URL", "Rental Price"]
+        hoa = row["HOA"]
+        rent = clean_currency(row["Rent"])
         price = clean_currency(row["Price"])
         loan_amount = price - (down_percent * price)
         monthly_rate = rate / 12
@@ -132,8 +134,9 @@ def calculate_mortgage_data(properties, down_percent=0.20, rate=0.065, term_mont
         properties.loc[index, 'down payment'] = down_percent * price
         properties.loc[index, 'monthly payment'] = float(monthly_payment)
         properties.loc[index, 'monthly taxes'] = float(monthly_property_tax)
-        # properties.loc[index, 'monthly taxes'] = monthly_property_tax
-        # properties.loc[index, 'monthly taxes'] = monthly_property_tax
+        properties.loc[index, 'monthly insurance'] = 300
+        expenses = round(monthly_payment + monthly_property_tax + hoa,2)
+        properties.loc[index, 'monthly balance'] = rent - expenses
 
 
 
@@ -171,11 +174,12 @@ def main(county="Temecula", max_price="750k", min_beds=3, min_baths=2.5, hoa=150
     print(f"Rental prices fetched for {len(properties_with_rentals)} properties.")
     
     # Convert to DataFrame
-    df = pd.DataFrame(properties_with_rentals, columns=["Address", "Price", "Redfin URL", "HOA", "Rental Price"])
+    df = pd.DataFrame(properties_with_rentals, columns=["Address", "Price", "Redfin URL", "HOA", "Rent"])
 
     # Step 4
     calculate_mortgage_data(properties=df)
     print(df)
+    df.to_csv("properties.csv")
 
     # # Step 5: Save the final data to a new CSV file
     # save_rental_to_csv(p)
