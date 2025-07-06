@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 
 # Function to scrape Redfin properties based on county and filters
-def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, hoa: int):
+def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, hoa: int, num_properties=200):
     url = f"https://www.redfin.com/city/19701/CA/{county}/filter/property-type=house,max-price={max_price},min-beds={min_beds},min-baths={min_baths},hoa={hoa}"
 
     headers = {
@@ -18,7 +18,7 @@ def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, 
     }
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
-
+    print(url)
     # Find all property listings on the page
     listings = soup.find_all('div', class_='HomeCardContainer')
     
@@ -46,8 +46,8 @@ def scrape_redfin(county: str, max_price: str, min_beds: int, min_baths: float, 
             link = 'https://www.redfin.com' + listing.find('a').get('href')
             
             # Append the data
-            properties.append([address, price, link, hoa_found])
-            if len(properties) > 1:
+            properties.append([address, clean_currency(price), link, hoa_found])
+            if len(properties) == num_properties:
                 return properties
         except AttributeError:
             continue  # Skip if any data is missing
@@ -88,23 +88,23 @@ def get_rental_price(address: str):
             return f"${rent}"
         else:
             print("Rent estimate not found in page text.")
-            return "Not Available"
+            return "0"
 
     except requests.exceptions.RequestException as e:
         print(f"Request error: {e}")
-        return "Not Available"
+        return "0"
     except Exception as e:
         print(f"Unexpected error: {e}")
-        return "Not Available"
+        return "0"
 
     except requests.exceptions.RequestException as e:
         # Handle errors (e.g., network issues, bad responses)
         print(f"Error fetching rental price: {e}")
-        return "Not Available"
+        return "0"
     except Exception as e:
         # Handle any other errors that may occur
         print(f"Unexpected error: {e}")
-        return "Not Available"
+        return "0"
 
 
 def clean_currency(val):
@@ -118,12 +118,12 @@ def calculate_mortgage_data(properties, down_percent=0.20, rate=0.065, term_mont
     properties["monthly payment"] = 0
     properties["monthly taxes"] = 0
     properties["monthly insurance"] = 0
-    properties["monthly balance"] = 0
+    properties["monthly cashflow"] = 0
     for index, row in properties.iterrows():
         # columns=["Address", "Price", "Redfin URL", "Rental Price"]
         hoa = row["HOA"]
-        rent = clean_currency(row["Rent"])
-        price = clean_currency(row["Price"])
+        rent = row["Rent"]
+        price = row["Price"]
         loan_amount = price - (down_percent * price)
         monthly_rate = rate / 12
         # Mortgage payment calculation
@@ -136,7 +136,7 @@ def calculate_mortgage_data(properties, down_percent=0.20, rate=0.065, term_mont
         properties.loc[index, 'monthly taxes'] = float(monthly_property_tax)
         properties.loc[index, 'monthly insurance'] = 300
         expenses = round(monthly_payment + monthly_property_tax + hoa,2)
-        properties.loc[index, 'monthly balance'] = rent - expenses
+        properties.loc[index, 'monthly cashflow'] = rent - expenses
 
 
 
@@ -147,7 +147,7 @@ def append_rental_prices(properties):
     for property in properties:
         address = property[0]
         rental_price = get_rental_price(address)
-        property.append(rental_price)
+        property.append(clean_currency(rental_price))
         time.sleep(1)  # Adding delay to be kind to the server
     
     return properties
@@ -161,12 +161,12 @@ def save_rental_to_csv(properties, filename="properties_with_rental.csv"):
             writer.writerow(prop)
 
 # Main function to combine scraping and rental price retrieval
-def main(county="Temecula", max_price="750k", min_beds=3, min_baths=2.5, hoa=150):
+def main(county="Temecula", max_price="750k", min_beds=3, min_baths=2.5, hoa=150, down_percent=0.20, rate=0.065, term_months=360, tax_rate = .011, num_properties = 2):
     # Step 1: Scrape Redfin for property listings
     print("Scraping Redfin for properties...")
-    properties = scrape_redfin(county, max_price, min_beds, min_baths, hoa)
+    properties = scrape_redfin(county, max_price, min_beds, min_baths, hoa, num_properties=num_properties)
     print(f"Found {len(properties)} properties.")
-    
+      
     
     # Step 3: Append rental prices from Zillow
     print("Fetching rental prices from Zillow...")
@@ -177,12 +177,12 @@ def main(county="Temecula", max_price="750k", min_beds=3, min_baths=2.5, hoa=150
     df = pd.DataFrame(properties_with_rentals, columns=["Address", "Price", "Redfin URL", "HOA", "Rent"])
 
     # Step 4
-    calculate_mortgage_data(properties=df)
+    calculate_mortgage_data(properties=df, down_percent=down_percent, rate=rate, term_months=term_months, tax_rate=tax_rate)
     print(df)
-    df.to_csv("properties.csv")
+    # df.to_csv("properties.csv")
+    return df.sort_values(by='monthly cashflow')
+    
 
-    # # Step 5: Save the final data to a new CSV file
-    # save_rental_to_csv(p)
 
     
 
